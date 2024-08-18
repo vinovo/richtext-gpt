@@ -1,13 +1,16 @@
+"use server";
+
 import OpenAI from 'openai';
 
 const DEFAULT_RICH_TEXT_PROMPT = "Your output will be displayed in a tinymce textbox. Output in rich text format.";
+const DEFAULT_API_KEY = process.env.OPENAI_API_KEY;
 
 let openaiInstance = null;
 
 const getOpenAIClient = (apiKey) => {
   if (!openaiInstance || openaiInstance.apiKey !== apiKey) {
     openaiInstance = new OpenAI({
-      apiKey: apiKey || process.env.OPENAI_API_KEY, // Use the user-provided key or fallback to env variable
+      apiKey: apiKey || DEFAULT_API_KEY, // Use the user-provided key or fallback to env variable
       dangerouslyAllowBrowser: true
     });
   }
@@ -59,4 +62,17 @@ export const streamToOpenAI = async (inputContent, apiKey, onData) => {
     console.error('Error sending the streaming request', error);
     throw error;
   }
+};
+
+export const OpenAIStream = async (inputContent, apiKey) => {
+  return new ReadableStream({
+    async start(controller) {
+      await streamToOpenAI(inputContent, apiKey, (data) => {
+        const encoder = new TextEncoder();
+        const chunk = encoder.encode(data);
+        controller.enqueue(chunk);
+      });
+      controller.close();
+    }
+  });
 };
